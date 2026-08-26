@@ -1,0 +1,15 @@
+# Ignorar absolutamente todo
+*
+
+# No ignorar el entorno virtual
+!.venv/
+!.venv/**
+
+# No ignorar archivos Python
+!*.py
+
+# No ignorar archivos Batch
+!*.bat
+
+# No ignorar este archivo
+!.gitignore
