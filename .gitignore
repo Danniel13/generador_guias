@@ -1,6 +1,9 @@
 # Ignorar absolutamente todo
 *
 
+# Ignorar explícitamente la carpeta de salida
+salida/
+
 # No ignorar el entorno virtual
 !.venv/
 !.venv/**
