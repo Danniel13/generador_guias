@@ -62,10 +62,17 @@ def configurar_documento(doc, margin_in):
     sec.bottom_margin = Inches(margin_in)
 
 
-def agregar_imagen_al_documento(doc, img, margin_in, gap_in):
+def agregar_imagen_al_documento(
+    doc,
+    img,
+    margin_in,
+    gap_in,
+    nueva_pagina=False
+):
     """
-    Agrega una nueva página al documento con la misma
-    estructura que tenía el archivo individual original.
+    Agrega la misma imagen en dos columnas.
+    Utiliza pageBreakBefore para iniciar cada guía
+    en una página nueva, sin insertar saltos manuales.
     """
 
     sec = doc.sections[0]
@@ -77,9 +84,11 @@ def agregar_imagen_al_documento(doc, img, margin_in, gap_in):
     avail_h = page_h - (2 * margin_in)
 
     cell_w = (avail_w - gap_in) / 2
-    cell_h = avail_h
 
-    # Crear tabla de 1 fila y 2 columnas
+    # Se conserva el espacio adicional de seguridad.
+    cell_h = avail_h - 0.30
+
+    # Crear tabla de una fila y dos columnas.
     table = doc.add_table(rows=1, cols=2)
 
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -87,8 +96,20 @@ def agregar_imagen_al_documento(doc, img, margin_in, gap_in):
 
     set_table_no_borders(table)
 
-    # Colocar la misma imagen dos veces,
-    # igual que en la lógica original
+    # Configurar márgenes internos de las celdas.
+    tbl_pr = table._tbl.tblPr
+
+    tbl_cell_mar = OxmlElement("w:tblCellMar")
+
+    for edge in ("top", "left", "bottom", "right"):
+        node = OxmlElement(f"w:{edge}")
+        node.set(qn("w:w"), "0")
+        node.set(qn("w:type"), "dxa")
+        tbl_cell_mar.append(node)
+
+    tbl_pr.append(tbl_cell_mar)
+
+    # Insertar la imagen en ambas columnas.
     for c in range(2):
         cell = table.cell(0, c)
 
@@ -97,6 +118,17 @@ def agregar_imagen_al_documento(doc, img, margin_in, gap_in):
 
         p = cell.paragraphs[0]
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+        p.paragraph_format.space_before = Inches(0)
+        p.paragraph_format.space_after = Inches(0)
+
+        # Iniciar esta tabla en una página nueva.
+        # Se aplica solamente al primer párrafo de la primera celda.
+        if nueva_pagina and c == 0:
+            pPr = p._p.get_or_add_pPr()
+
+            page_break = OxmlElement("w:pageBreakBefore")
+            pPr.append(page_break)
 
         w_fit, h_fit = fit_size_keep_aspect(
             str(img),
@@ -145,9 +177,10 @@ def main():
         ".tiff"
     }
 
+    # Buscar imágenes en el directorio actual.
     imgs = sorted(images_dir.glob("*.*"))
 
-    # Filtrar únicamente imágenes válidas
+    # Filtrar únicamente imágenes válidas.
     imagenes_validas = [
         img for img in imgs
         if img.suffix.lower() in valid_ext
@@ -174,18 +207,15 @@ def main():
 
         print(f"Procesando {numero}/{total}: {img.name}")
 
-        # Agregar el contenido de esta imagen
+        # Cada imagen se agrega como una guía duplicada.
+        # A partir de la segunda, se solicita una página nueva.
         agregar_imagen_al_documento(
             doc=doc,
             img=img,
             margin_in=0.3,
-            gap_in=0.2
+            gap_in=0.2,
+            nueva_pagina=(numero > 1)
         )
-
-        # Agregar salto de página si todavía
-        # faltan imágenes por procesar
-        if numero < total:
-            doc.add_page_break()
 
     # ==================================================
     # GUARDAR UN ÚNICO ARCHIVO
@@ -213,7 +243,7 @@ def main():
 
         print(f"PDF creado: {output_pdf}")
 
-        # Eliminar el DOCX temporal
+        # Eliminar el DOCX temporal.
         output_docx.unlink(missing_ok=True)
 
         print(f"DOCX temporal eliminado: {output_docx}")
